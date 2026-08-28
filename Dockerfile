@@ -29,5 +29,8 @@ RUN go build -tags mcpengine -ldflags="-s -w" -o /out/hub ./cmd/hub
 # ---------- Stage 3: minimal runtime image ----------
 FROM gcr.io/distroless/base-debian12:nonroot
 COPY --from=go-builder /out/hub /hub
+# The cgo binary dynamically links libmcpengine; ship the cdylib alongside it.
+COPY --from=rust-builder /src/mcp-engine/target/release/libmcpengine.so /usr/local/lib/libmcpengine.so
+ENV LD_LIBRARY_PATH=/usr/local/lib
 EXPOSE 8080
 ENTRYPOINT ["/hub"]
