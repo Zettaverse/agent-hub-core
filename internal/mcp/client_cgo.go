@@ -5,6 +5,7 @@ package mcp
 /*
 #cgo LDFLAGS: -lmcpengine
 #cgo linux LDFLAGS: -L${SRCDIR}/../../third_party/mcp-engine/target/release
+#include <stdlib.h>
 #include "../../third_party/mcp-engine/include/mcpengine.h"
 */
 import "C"
