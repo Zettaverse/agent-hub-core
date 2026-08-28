@@ -1,0 +1,750 @@
+openapi: 3.0.3
+info:
+  title: Zettaverse Agent Hub Core API
+  version: 1.0.0
+  description: |
+    HTTP + WebSocket API for the agent-hub-core platform: agents, MCP servers,
+    flows, runs, tasks, users, and a live activity feed.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: auth
+  - name: agents
+  - name: mcp-servers
+  - name: flows
+  - name: runs
+  - name: tasks
+  - name: users
+  - name: dashboard
+  - name: system
+paths:
+  /healthz:
+    get:
+      tags: [system]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /readyz:
+    get:
+      tags: [system]
+      summary: Readiness probe
+      responses:
+        '200':
+          description: ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /metrics:
+    get:
+      tags: [system]
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate and obtain a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          description: invalid credentials
+  /api/v1/me:
+    get:
+      tags: [auth]
+      summary: Current authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /api/v1/agents:
+    get:
+      tags: [agents]
+      summary: List agents
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: list of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+    post:
+      tags: [agents]
+      summary: Create an agent (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInput'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+  /api/v1/agents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    get:
+      tags: [agents]
+      summary: Get an agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+    put:
+      tags: [agents]
+      summary: Update an agent (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInput'
+      responses:
+        '200':
+          description: updated agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+    delete:
+      tags: [agents]
+      summary: Delete an agent (owner)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: deleted
+  /api/v1/mcp-servers:
+    get:
+      tags: [mcp-servers]
+      summary: List MCP servers
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: list of MCP servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/McpServer'
+    post:
+      tags: [mcp-servers]
+      summary: Create an MCP server (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpServerInput'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpServer'
+  /api/v1/mcp-servers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    get:
+      tags: [mcp-servers]
+      summary: Get an MCP server
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: MCP server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpServer'
+    put:
+      tags: [mcp-servers]
+      summary: Update an MCP server (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpServerInput'
+      responses:
+        '200':
+          description: updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpServer'
+    delete:
+      tags: [mcp-servers]
+      summary: Delete an MCP server (owner)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: deleted
+  /api/v1/mcp-servers/{id}/test:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    post:
+      tags: [mcp-servers]
+      summary: Test connectivity to an MCP server
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: connectivity result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  error:
+                    type: string
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tool'
+  /api/v1/flows:
+    get:
+      tags: [flows]
+      summary: List flows
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: list of flows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Flow'
+    post:
+      tags: [flows]
+      summary: Create a flow (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowInput'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+  /api/v1/flows/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    get:
+      tags: [flows]
+      summary: Get a flow
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+    put:
+      tags: [flows]
+      summary: Update a flow (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowInput'
+      responses:
+        '200':
+          description: updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+    delete:
+      tags: [flows]
+      summary: Delete a flow (owner)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: deleted
+  /api/v1/flows/{id}/run:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    post:
+      tags: [flows]
+      summary: Execute a flow (operator)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: run started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run_id:
+                    type: string
+  /api/v1/flows/{id}/runs:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    get:
+      tags: [runs]
+      summary: List runs for a flow
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: list of runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Run'
+  /api/v1/runs/{run_id}:
+    parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [runs]
+      summary: Get a run
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+  /api/v1/tasks:
+    post:
+      tags: [tasks]
+      summary: Create (decompose + distribute) a task (operator)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task]
+              properties:
+                task:
+                  type: string
+      responses:
+        '200':
+          description: task created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+  /api/v1/tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    get:
+      tags: [tasks]
+      summary: Get a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /api/v1/users:
+    get:
+      tags: [users]
+      summary: List users (owner)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      tags: [users]
+      summary: Create a user (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /api/v1/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+    get:
+      tags: [users]
+      summary: Get a user (owner)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      tags: [users]
+      summary: Update a user (owner)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '200':
+          description: updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    delete:
+      tags: [users]
+      summary: Delete a user (owner)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: deleted
+  /api/v1/dashboard:
+    get:
+      tags: [dashboard]
+      summary: Aggregate platform stats
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: dashboard counters
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/ws:
+    get:
+      tags: [dashboard]
+      summary: Live activity feed (WebSocket)
+      description: |
+        Upgrades to a WebSocket. Authentication is via the `token` query
+        parameter. Messages are JSON: `{type, tenant, payload, time}` where
+        type is one of `agent_message`, `run_update`, `task_update`.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket upgrade
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Status:
+      type: object
+      properties:
+        status:
+          type: string
+    Skill:
+      type: object
+      required: [name, server_id, tool]
+      properties:
+        name:
+          type: string
+        server_id:
+          type: string
+        tool:
+          type: string
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        name:
+          type: string
+        profile:
+          type: string
+        system_prompt:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AgentInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        profile:
+          type: string
+        system_prompt:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+        enabled:
+          type: boolean
+    McpServer:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        name:
+          type: string
+        transport:
+          type: object
+          description: transport config (type, command, args, url)
+        enabled:
+          type: boolean
+        status:
+          type: string
+    McpServerInput:
+      type: object
+      required: [name, transport]
+      properties:
+        name:
+          type: string
+        transport:
+          type: object
+        enabled:
+          type: boolean
+    Tool:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    Permissions:
+      type: object
+      properties:
+        resources:
+          type: array
+          items:
+            type: string
+        files:
+          type: array
+          items:
+            type: string
+        databases:
+          type: array
+          items:
+            type: string
+    Flow:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        name:
+          type: string
+        flow_json:
+          type: object
+        permissions:
+          $ref: '#/components/schemas/Permissions'
+        enabled:
+          type: boolean
+    FlowInput:
+      type: object
+      required: [name, flow_json]
+      properties:
+        name:
+          type: string
+        flow_json:
+          type: object
+        permissions:
+          $ref: '#/components/schemas/Permissions'
+        enabled:
+          type: boolean
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+        message:
+          type: string
+        source:
+          type: string
+    Run:
+      type: object
+      properties:
+        id:
+          type: string
+        flow_id:
+          type: string
+        tenant_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, success, failed, rolled_back]
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogEntry'
+        result:
+          type: object
+    Subtask:
+      type: object
+      properties:
+        id:
+          type: string
+        agent_id:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, success, failed]
+        result:
+          type: object
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        input:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, success, failed]
+        subtasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subtask'
+        result:
+          type: object
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [viewer, operator, owner]
+    UserInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [viewer, operator, owner]

@@ -1,0 +1,18 @@
+# Build artifacts
+target/
+third_party/mcp-engine/target/
+
+# Git
+.git
+.gitignore
+
+# Go
+bin/
+*.exe
+*.test
+
+# CI / docs not needed at build time
+.github/
+openapi/
+README.md
+LICENSE
