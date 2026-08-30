@@ -34,6 +34,7 @@ type Server struct {
 	Flow         *flow.Engine
 	Hub          *ws.Hub
 	Metrics      *metrics.Metrics
+	History      *HistoryCollector
 	Logger       *slog.Logger
 	Config       config.Config
 }
@@ -42,14 +43,16 @@ type Server struct {
 func NewServer(cfg config.Config, st store.Store, logger *slog.Logger) *Server {
 	mcpClient := mcp.NewClient()
 	sideEffects := flow.NewMemorySideEffectStore()
+	hub := ws.NewHub()
 	return &Server{
 		Store:        st,
 		Auth:         auth.NewManager(cfg.JWTSecret, cfg.JWTExpiry),
 		MCP:          mcpClient,
 		Orchestrator: orchestrator.New(st, mcpClient, orchestrator.WithWorkers(cfg.TaskWorkerPool), orchestrator.WithTimeout(cfg.TaskTimeout)),
 		Flow:         flow.NewEngine(st, mcpClient, sideEffects),
-		Hub:          ws.NewHub(),
+		Hub:          hub,
 		Metrics:      metrics.New(),
+		History:      NewHistoryCollector(cfg.DashboardHistoryCapacity, cfg.DashboardHistoryInterval, nil, hub.ClientCount),
 		Logger:       logger,
 		Config:       cfg,
 	}
@@ -117,6 +120,7 @@ func (s *Server) Router() http.Handler {
 
 			// Dashboard
 			r.Get("/dashboard", s.handleDashboard)
+			r.Get("/dashboard/history", s.handleDashboardHistory)
 		})
 	})
 

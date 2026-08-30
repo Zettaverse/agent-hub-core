@@ -33,6 +33,9 @@ func newTestEnv(t *testing.T) *testEnv {
 		TaskTimeout:       5 * time.Second,
 	}
 	s := NewServer(cfg, st, logger)
+	// Deterministic CPU sampler so dashboard/history tests never depend on
+	// gopsutil timing.
+	s.History.cpuSampler = func() float64 { return 12.34 }
 	ts := httptest.NewServer(s.Router())
 	t.Cleanup(ts.Close)
 	return &testEnv{srv: s, ts: ts, store: st}
@@ -287,8 +290,84 @@ func TestDashboard(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("dashboard status = %d, body = %s", resp.StatusCode, body)
 	}
-	if !strings.Contains(body, "agents") {
-		t.Fatalf("dashboard body = %s", body)
+
+	var d struct {
+		Agents struct {
+			Online int `json:"online"`
+			Total  int `json:"total"`
+		} `json:"agents"`
+		McpServers struct {
+			Connected int `json:"connected"`
+			Total     int `json:"total"`
+		} `json:"mcp_servers"`
+		ActiveFlows int `json:"active_flows"`
+		System      struct {
+			CPU        float64 `json:"cpu"`
+			Memory     uint64  `json:"memory"`
+			Goroutines int     `json:"goroutines"`
+		} `json:"system"`
+		RunsByStatus    map[string]int `json:"runs_by_status"`
+		TasksByStatus   map[string]int `json:"tasks_by_status"`
+		WebSocketClient int            `json:"websocket_clients"`
+	}
+	if err := json.Unmarshal([]byte(body), &d); err != nil {
+		t.Fatalf("unmarshal dashboard: %v (body=%s)", err, body)
+	}
+
+	// Empty store: zero counts everywhere.
+	if d.Agents.Online != 0 || d.Agents.Total != 0 {
+		t.Fatalf("agents = %+v", d.Agents)
+	}
+	if d.McpServers.Connected != 0 || d.McpServers.Total != 0 {
+		t.Fatalf("mcp_servers = %+v", d.McpServers)
+	}
+	if d.ActiveFlows != 0 {
+		t.Fatalf("active_flows = %d", d.ActiveFlows)
+	}
+	if d.System.CPU != 12.34 {
+		t.Fatalf("system.cpu = %f", d.System.CPU)
+	}
+	if d.System.Goroutines < 0 {
+		t.Fatalf("system.goroutines = %d", d.System.Goroutines)
+	}
+	if d.System.Memory < 0 {
+		t.Fatalf("system.memory = %d", d.System.Memory)
+	}
+	if d.WebSocketClient != 0 {
+		t.Fatalf("websocket_clients = %d", d.WebSocketClient)
+	}
+
+	for _, key := range []string{"success", "failed", "rolled_back", "pending", "running"} {
+		if _, ok := d.RunsByStatus[key]; !ok {
+			t.Fatalf("runs_by_status missing key %q: %+v", key, d.RunsByStatus)
+		}
+	}
+	for _, key := range []string{"success", "failed", "pending", "running"} {
+		if _, ok := d.TasksByStatus[key]; !ok {
+			t.Fatalf("tasks_by_status missing key %q: %+v", key, d.TasksByStatus)
+		}
+	}
+}
+
+func TestDashboardHistory(t *testing.T) {
+	e := newTestEnv(t)
+	tok := e.token(t, "owner")
+
+	resp, body := e.do(t, http.MethodGet, "/api/v1/dashboard/history", "", tok)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("dashboard history status = %d, body = %s", resp.StatusCode, body)
+	}
+
+	var h struct {
+		Samples []Sample `json:"samples"`
+	}
+	if err := json.Unmarshal([]byte(body), &h); err != nil {
+		t.Fatalf("unmarshal history: %v (body=%s)", err, body)
+	}
+	// Samples may be empty when no tick has fired, but the field must exist
+	// and marshal as an array (not null).
+	if h.Samples == nil {
+		t.Fatalf("samples should be an array, got null (body=%s)", body)
 	}
 }
 

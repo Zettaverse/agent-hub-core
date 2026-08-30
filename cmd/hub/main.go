@@ -38,6 +38,8 @@ func main() {
 	defer st.Close()
 
 	srv := api.NewServer(cfg, st, logger)
+	srv.History.Start()
+	defer srv.History.Stop()
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),

@@ -6,14 +6,41 @@ import (
 	"github.com/Zettaverse/agent-hub-core/internal/store"
 )
 
-func countEnabledAgents(agents []store.Agent) int {
-	n := 0
-	for _, a := range agents {
-		if a.Enabled {
-			n++
+// runStatusCounts returns a map of every RunStatus to its occurrence count,
+// zero-filled so the dashboard always reports the full status set.
+func runStatusCounts(runs []store.Run) map[string]int {
+	counts := map[string]int{
+		string(store.RunStatusSuccess):    0,
+		string(store.RunStatusFailed):     0,
+		string(store.RunStatusRolledBack): 0,
+		string(store.RunStatusPending):    0,
+		string(store.RunStatusRunning):    0,
+	}
+	for _, r := range runs {
+		key := string(r.Status)
+		if _, ok := counts[key]; ok {
+			counts[key]++
 		}
 	}
-	return n
+	return counts
+}
+
+// taskStatusCounts returns a map of every TaskStatus to its occurrence count,
+// zero-filled so the dashboard always reports the full status set.
+func taskStatusCounts(tasks []store.Task) map[string]int {
+	counts := map[string]int{
+		string(store.TaskStatusSuccess): 0,
+		string(store.TaskStatusFailed):  0,
+		string(store.TaskStatusPending): 0,
+		string(store.TaskStatusRunning): 0,
+	}
+	for _, t := range tasks {
+		key := string(t.Status)
+		if _, ok := counts[key]; ok {
+			counts[key]++
+		}
+	}
+	return counts
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -24,24 +51,55 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	runs, _ := s.Store.ListRuns(r.Context(), tenant, "")
 	tasks, _ := s.Store.ListTasks(r.Context(), tenant)
 
-	var runsByStatus = map[string]int{}
-	for _, run := range runs {
-		runsByStatus[string(run.Status)]++
+	onlineAgents := 0
+	for _, a := range agents {
+		if a.Enabled {
+			onlineAgents++
+		}
 	}
-	var tasksByStatus = map[string]int{}
-	for _, task := range tasks {
-		tasksByStatus[string(task.Status)]++
+	connectedServers := 0
+	for _, srv := range servers {
+		if srv.Status == "connected" {
+			connectedServers++
+		}
+	}
+	activeFlows := 0
+	for _, f := range flows {
+		if f.Enabled {
+			activeFlows++
+		}
+	}
+
+	// Prefer the collector's latest sample; fall back to sampling on demand so
+	// the dashboard is deterministic even before the first tick.
+	sample := s.History.Latest()
+	if sample.Time == 0 {
+		sample = s.History.Capture()
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"agents":            len(agents),
-		"enabled_agents":    countEnabledAgents(agents),
-		"mcp_servers":       len(servers),
-		"flows":             len(flows),
-		"runs":              len(runs),
-		"runs_by_status":    runsByStatus,
-		"tasks":             len(tasks),
-		"tasks_by_status":   tasksByStatus,
+		"agents": map[string]int{
+			"online": onlineAgents,
+			"total":  len(agents),
+		},
+		"mcp_servers": map[string]int{
+			"connected": connectedServers,
+			"total":     len(servers),
+		},
+		"active_flows": activeFlows,
+		"system": map[string]any{
+			"cpu":        sample.CPU,
+			"memory":     sample.Memory,
+			"goroutines": sample.Goroutines,
+		},
+		"runs_by_status":    runStatusCounts(runs),
+		"tasks_by_status":   taskStatusCounts(tasks),
 		"websocket_clients": s.Hub.ClientCount(),
+	})
+}
+
+func (s *Server) handleDashboardHistory(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"samples": s.History.Snapshot(),
 	})
 }

@@ -28,23 +28,29 @@ type Config struct {
 	// Task distribution tuning.
 	TaskWorkerPool int
 	TaskTimeout    time.Duration
+
+	// Dashboard history collector tuning.
+	DashboardHistoryCapacity int
+	DashboardHistoryInterval time.Duration
 }
 
 // Load reads configuration from the process environment, applying defaults
 // for any unset value.
 func Load() Config {
 	return Config{
-		Port:              envInt("PORT", 8080),
-		Host:              envStr("HOST", "0.0.0.0"),
-		DatabaseURL:       envStr("DATABASE_URL", ""),
-		JWTSecret:         envStr("JWT_SECRET", ""),
-		JWTExpiry:         envDuration("JWT_EXPIRY", 24*time.Hour),
-		LogLevel:          envStr("LOG_LEVEL", "info"),
-		SeedOwnerUsername: envStr("SEED_OWNER_USERNAME", "admin"),
-		SeedOwnerPassword: envStr("SEED_OWNER_PASSWORD", "admin"),
-		UseMemoryStore:    envBool("USE_MEMORY_STORE", false),
-		TaskWorkerPool:    envInt("TASK_WORKER_POOL", 4),
-		TaskTimeout:       envDuration("TASK_TIMEOUT", 30*time.Second),
+		Port:                     envInt("PORT", 8080),
+		Host:                     envStr("HOST", "0.0.0.0"),
+		DatabaseURL:              envStr("DATABASE_URL", ""),
+		JWTSecret:                envStr("JWT_SECRET", ""),
+		JWTExpiry:                envDuration("JWT_EXPIRY", 24*time.Hour),
+		LogLevel:                 envStr("LOG_LEVEL", "info"),
+		SeedOwnerUsername:        envStr("SEED_OWNER_USERNAME", "admin"),
+		SeedOwnerPassword:        envStr("SEED_OWNER_PASSWORD", "admin"),
+		UseMemoryStore:           envBool("USE_MEMORY_STORE", false),
+		TaskWorkerPool:           envInt("TASK_WORKER_POOL", 4),
+		TaskTimeout:              envDuration("TASK_TIMEOUT", 30*time.Second),
+		DashboardHistoryCapacity: envInt("DASHBOARD_HISTORY_CAPACITY", 120),
+		DashboardHistoryInterval: envDuration("DASHBOARD_HISTORY_INTERVAL", 5*time.Second),
 	}
 }
 
