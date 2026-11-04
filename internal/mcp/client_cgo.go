@@ -110,6 +110,9 @@ func (c *cgoClient) CallTool(ctx context.Context, s Transport, name string, args
 		return nil, err
 	}
 	defer eng.free()
+	if args == nil {
+		args = map[string]any{}
+	}
 	argsJSON, err := json.Marshal(args)
 	if err != nil {
 		return nil, err
@@ -152,6 +155,9 @@ func (c *cgoClient) GetPrompt(ctx context.Context, s Transport, name string, arg
 		return nil, err
 	}
 	defer eng.free()
+	if args == nil {
+		args = map[string]any{}
+	}
 	argsJSON, err := json.Marshal(args)
 	if err != nil {
 		return nil, err
@@ -178,6 +184,9 @@ func serverIDFor(s Transport) string {
 
 // connect allocates a libmcpengine engine and connects it to the transport.
 func (c *cgoClient) connect(s Transport) (*engine, error) {
+	if s.Type != "stdio" && s.Type != "websocket" {
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedTransport, s.Type)
+	}
 	configJSON := `{"log_level":"info","max_message_bytes":1048576,"sanitize":true,"connect_timeout_ms":10000}`
 	cCfg := C.CString(configJSON)
 	defer C.free(unsafe.Pointer(cCfg))

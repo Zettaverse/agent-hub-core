@@ -32,8 +32,10 @@ func TestStdioHelper(t *testing.T) {
 		}
 		var result any
 		switch req.Method {
+		case "initialize":
+			result = map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{}, "serverInfo": map[string]any{"name": "test", "version": "1"}}
 		case "tools/list":
-			result = map[string]any{"tools": []map[string]any{{"name": "echo", "description": "echo tool"}}}
+			result = map[string]any{"tools": []map[string]any{{"name": "echo", "description": "echo tool", "inputSchema": map[string]any{"type": "object"}}}}
 		case "resources/list":
 			result = map[string]any{"resources": []map[string]any{{"uri": "res://1", "name": "r1"}}}
 		case "prompts/list":
@@ -108,6 +110,9 @@ func TestWebsocketJSONRPC(t *testing.T) {
 				return
 			}
 			result := map[string]any{"content": []map[string]any{{"type": "text", "text": "ws-result"}}, "isError": false}
+			if req.Method == "initialize" {
+				result = map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{}, "serverInfo": map[string]any{"name": "test", "version": "1"}}
+			}
 			_ = conn.WriteJSON(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
 		}
 	}))
