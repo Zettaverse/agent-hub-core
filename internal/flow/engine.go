@@ -78,33 +78,49 @@ func (e *Engine) Execute(ctx context.Context, fl store.Flow) ExecutionResult {
 	ec.outputs[trigger.ID] = triggerOut
 	ec.log("info", fmt.Sprintf("node %s executed", trigger.ID))
 
-	type queueItem struct{ nodeID string }
-	queue := []queueItem{{nodeID: trigger.ID}}
-	visited := map[string]bool{trigger.ID: true}
+	// Process vertices only after every predecessor has been considered. An
+	// inactive conditional path does not activate its descendants, but still
+	// counts as considered when a later join is reached.
+	active := map[string]bool{trigger.ID: true}
+	incoming := make(map[string][]Edge)
+	for _, edge := range g.Edges {
+		incoming[edge.Target] = append(incoming[edge.Target], edge)
+	}
 	var order []string
-
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		node := g.Nodes[cur.nodeID]
-		handles := emittedHandles(node, ec.outputs[cur.nodeID])
-		for _, h := range handles {
-			for _, edge := range g.OutgoingEdges(cur.nodeID, h) {
-				if visited[edge.Target] {
-					continue
+	for _, id := range g.TopologicalOrder() {
+		if id == trigger.ID {
+			continue
+		}
+		var input any
+		found := false
+		for _, edge := range incoming[id] {
+			if !active[edge.Source] {
+				continue
+			}
+			for _, handle := range emittedHandles(g.Nodes[edge.Source], ec.outputs[edge.Source]) {
+				if handle == edge.SourceHandle {
+					// Keep the existing single-input contract: the first active
+					// incoming edge in declaration order supplies the input.
+					input = ec.outputs[edge.Source]
+					found = true
+					break
 				}
-				visited[edge.Target] = true
-				targetNode := g.Nodes[edge.Target]
-				out, err := e.executeNode(ec, targetNode, ec.outputs[cur.nodeID])
-				if err != nil {
-					return e.rollbackAndFail(ec, err)
-				}
-				ec.outputs[edge.Target] = out
-				ec.log("info", fmt.Sprintf("node %s executed", edge.Target))
-				order = append(order, edge.Target)
-				queue = append(queue, queueItem{nodeID: edge.Target})
+			}
+			if found {
+				break
 			}
 		}
+		if !found {
+			continue
+		}
+		out, err := e.executeNode(ec, g.Nodes[id], input)
+		if err != nil {
+			return e.rollbackAndFail(ec, err)
+		}
+		active[id] = true
+		ec.outputs[id] = out
+		ec.log("info", fmt.Sprintf("node %s executed", id))
+		order = append(order, id)
 	}
 
 	resultMap := make(map[string]any, len(order)+1)

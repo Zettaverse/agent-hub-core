@@ -138,6 +138,12 @@ role), `Tenant` (uuid, name).
 }
 ```
 
+Nodes execute sequentially in topological order. A node runs when at least one
+incoming edge is active, after all its predecessors have been considered.
+Inactive conditional branches are skipped. For multiple active incoming edges,
+the first edge in the `edges` array supplies the node input; inputs are not
+merged. This ordering can differ from earlier breadth-first execution.
+
 Conditions support `== != > < >= <= && || !`, `.length`, string/number/bool
 literals, and `result` / `result.field` access. Side-effecting `output` nodes
 (`database`/`file`/`modbus`) must match `flow.permissions`; on any node error,
